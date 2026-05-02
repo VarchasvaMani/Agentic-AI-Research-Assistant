@@ -1,126 +1,156 @@
-# Agentic RAG Research Assistant
+# 🔬 Agentic RAG Research Assistant
 
-A production-ready multi-step AI agent that autonomously retrieves, summarises,
-and answers questions over research documents.
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/LangChain-0.2.6-green?logo=chainlink&logoColor=white" />
+  <img src="https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white" />
+  <img src="https://img.shields.io/badge/ChromaDB-0.5.3-orange" />
+  <img src="https://img.shields.io/badge/Claude_API-Anthropic-blueviolet?logo=anthropic&logoColor=white" />
+  <img src="https://img.shields.io/badge/Ollama-Local_LLM-black?logo=ollama&logoColor=white" />
+  <img src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white" />
+  <img src="https://img.shields.io/badge/License-MIT-yellow" />
+</p>
 
-**Stack:** LangChain · Anthropic Claude API · ChromaDB · FastAPI · Python 3.12
+<p align="center">
+  A production-ready <strong>multi-step AI agent</strong> that autonomously retrieves, summarises,
+  and answers questions over research documents using LangChain's ReAct loop,
+  ChromaDB vector store, and your choice of LLM backend.
+</p>
 
 ---
 
-## Architecture
+## ✨ Features
+
+- 🤖 **Agentic ReAct loop** — Claude autonomously decides which tools to call, in what order, and when to stop
+- 📚 **RAG pipeline** — documents are chunked, embedded, and stored in ChromaDB for grounded, citation-backed answers
+- 🔀 **Dual LLM backend** — switch between Anthropic Claude (cloud) and Ollama (free, local) with a single `.env` change
+- 🌐 **FastAPI REST API** — MCP-compatible OpenAPI schema at `/openapi.json`
+- 📄 **Multi-format ingestion** — supports `.pdf`, `.txt`, and `.md` files
+- 🐳 **Docker ready** — one command to spin up with persistent ChromaDB volume
+- ✅ **Test suite** — 15 unit + integration tests with pytest
+
+---
+
+## 🏗️ Architecture
 
 ```
 User / Client
-    │
-    ▼  HTTP POST /ask
-┌─────────────────────────────┐
-│         FastAPI             │  ← MCP-compatible tool schema
-│   (request validation,      │
-│    OpenAPI docs at /docs)   │
-└────────────┬────────────────┘
-             │ invoke
-             ▼
-┌─────────────────────────────┐
-│     LangChain ReAct Agent   │  ← Orchestrates tool calls
-│                             │
-│  Thought → Act → Observe    │  ← ReAct loop (max 8 iterations)
-│     ↑_________________________│
-└──────┬──────────────┬────────┘
-       │              │
-       ▼              ▼
-┌──────────┐   ┌──────────────────┐
-│ Claude   │   │    ChromaDB      │
-│   API    │   │  (vector store)  │
-│ (Claude  │   │                  │
-│ Sonnet)  │   │ top-k semantic   │
-│          │   │ similarity search│
-└──────────┘   └──────────────────┘
-                       ▲
-               ┌───────┴────────┐
-               │  Doc Ingestion │
-               │ chunk→embed→   │
-               │    store       │
-               └────────────────┘
-                       ▲
-               PDFs, .txt, .md files
+     │
+     ▼  HTTP POST /ask
+┌──────────────────────────────┐
+│          FastAPI             │  ← MCP-compatible tool schema
+│  (validation + OpenAPI docs) │
+└─────────────┬────────────────┘
+              │ invoke
+              ▼
+┌──────────────────────────────┐
+│    LangChain ReAct Agent     │  ← Orchestrates tool calls
+│                              │
+│   Thought → Act → Observe    │  ← Loop up to 8 iterations
+│      ↑_______________________|
+└───────┬──────────────┬───────┘
+        │              │
+        ▼              ▼
+┌────────────┐  ┌─────────────────┐
+│ Claude API │  │    ChromaDB     │
+│    or      │  │  (vector store) │
+│   Ollama   │  │  top-k search   │
+└────────────┘  └────────┬────────┘
+                         ▲
+                ┌────────┴────────┐
+                │  Doc Ingestion  │
+                │ chunk→embed→    │
+                │    store        │
+                └─────────────────┘
+                         ▲
+                PDFs · TXT · MD files
 ```
 
 ### How tool selection works
 
-The agent receives all tool schemas (name + description + JSON input schema)
-in its system prompt.  Claude reads these and autonomously decides:
+The agent receives all tool schemas (name + description + JSON input schema) in its system prompt. The LLM reads these and autonomously decides:
 
-1. Which tool to call (based on tool descriptions vs. current need)
-2. What arguments to pass (from the JSON schema)
-3. Whether to loop again after observing the result
+1. **Which tool to call** — based on tool descriptions vs. current need
+2. **What arguments to pass** — from the tool's JSON schema
+3. **Whether to loop again** — after observing the tool's output
 
-This is the **ReAct** (Reason + Act) pattern — the agent interleaves
-reasoning ("Thought") with action ("Action") and observation ("Observation")
-until it has enough information to emit a final answer.
+This is the **ReAct** (Reason + Act) pattern — the agent interleaves reasoning (`Thought`) with action (`Action`) and observation (`Observation`) until it has enough information to emit a final answer.
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Prerequisites
+### Prerequisites
 
 - Python 3.11+
-- An Anthropic API key from [console.anthropic.com](https://console.anthropic.com)
+- One of:
+  - Anthropic API key → [console.anthropic.com](https://console.anthropic.com)
+  - Ollama installed → [ollama.com](https://ollama.com) *(free, no key needed)*
 
-### 2. Install
+### 1. Clone & Install
 
 ```bash
-git clone <repo>
-cd rag_agent
+git clone https://github.com/VarchasvaMani/Agentic-AI-Research-Assistant.git
+cd Agentic-AI-Research-Assistant
 
 python -m venv .venv
-source .venv/bin/activate     # Windows: .venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
 pip install -r requirements.txt
 ```
 
-### 3. Configure — choose your LLM backend
+### 2. Configure — choose your LLM backend
 
-**Option A — Anthropic Claude** (best quality, requires API key)
+Copy the example config:
 ```bash
 cp .env.example .env
-# Set LLM_BACKEND=anthropic and your ANTHROPIC_API_KEY in .env
 ```
 
-**Option B — Ollama** (free, local, no API key needed)
+**Option A — Anthropic Claude** *(best quality, requires API key)*
+```env
+LLM_BACKEND=anthropic
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+CLAUDE_MODEL=claude-sonnet-4-20250514
+```
+
+**Option B — Ollama** *(free, runs locally, no API key needed)*
+```env
+LLM_BACKEND=ollama
+OLLAMA_MODEL=llama3
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+Then pull a model with Ollama:
 ```bash
-cp .env.example .env
-# Set LLM_BACKEND=ollama in .env
+ollama pull llama3      # best quality  (~5 GB RAM)
+ollama pull mistral     # balanced      (~4 GB RAM)
+ollama pull phi3        # lightest      (~2 GB RAM)
 
-# Install Ollama from https://ollama.com then pull a model:
-ollama pull llama3      # best quality (~5 GB RAM)
-ollama pull mistral     # balanced    (~4 GB RAM)
-ollama pull phi3        # lightest    (~2 GB RAM)
-
-# Also install the LangChain Ollama package:
-pip install langchain-ollama
+pip install langchain-ollama   # one extra package for Ollama
 ```
 
-### 4. Ingest sample documents
+### 3. Ingest documents
 
 ```bash
 python -m app.ingestion --docs ./sample_docs
 ```
 
-This loads the three included research summaries (Attention Is All You Need,
-RAG paper, LLM Agents survey) into ChromaDB.
+This loads the three included research papers into ChromaDB.
 
-### 5. Start the API server
+### 4. Start the server
 
 ```bash
 python run.py
 # or: uvicorn app.main:app --reload
 ```
 
-API docs: http://localhost:8000/docs
-Health:   http://localhost:8000/health
+| URL | Description |
+|-----|-------------|
+| http://localhost:8000/docs | Interactive API docs (Swagger UI) |
+| http://localhost:8000/health | Health check + vector count |
+| http://localhost:8000/redoc | ReDoc API reference |
 
-### 6. Ask a question
+### 5. Ask a question
 
 ```bash
 curl -X POST http://localhost:8000/ask \
@@ -128,8 +158,7 @@ curl -X POST http://localhost:8000/ask \
   -d '{"question": "How does multi-head attention work?", "include_steps": true}'
 ```
 
-Or use the CLI:
-
+Or use the interactive CLI (no server needed):
 ```bash
 python scripts/query_cli.py "What are the key findings of the RAG paper?"
 python scripts/query_cli.py --interactive --steps
@@ -137,19 +166,20 @@ python scripts/query_cli.py --interactive --steps
 
 ---
 
-## Endpoints
+## 📡 API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Liveness check, vector count |
-| GET | `/sources` | List ingested document sources |
-| POST | `/ask` | Submit a research question |
-| POST | `/ingest/file` | Upload a PDF / text file |
-| POST | `/ingest/directory` | Ingest a server-side directory |
-| DELETE | `/collection` | Wipe the ChromaDB collection |
+| `GET` | `/health` | Liveness check, active backend, vector count |
+| `GET` | `/sources` | List all ingested document sources |
+| `POST` | `/ask` | Submit a research question to the agent |
+| `POST` | `/ingest/file` | Upload a PDF / TXT / MD file |
+| `POST` | `/ingest/directory` | Ingest all docs in a server-side directory |
+| `DELETE` | `/collection` | Wipe the ChromaDB collection |
 
-### POST /ask — Request body
+### POST /ask
 
+**Request:**
 ```json
 {
   "question": "What is the ReAct framework?",
@@ -158,149 +188,168 @@ python scripts/query_cli.py --interactive --steps
 }
 ```
 
-### POST /ask — Response
-
+**Response:**
 ```json
 {
-  "answer": "The ReAct framework interleaves reasoning traces with...",
+  "answer": "The ReAct framework interleaves reasoning traces with tool calls...",
   "sources": ["llm_agents_survey.txt"],
   "iterations": 3,
   "steps": null
 }
 ```
 
-With `include_steps: true`, `steps` contains each tool call:
-
+With `include_steps: true`, the full reasoning chain is returned:
 ```json
 "steps": [
-  {"tool": "list_sources",        "input": {},                        "output": "..."},
-  {"tool": "retrieve_documents",  "input": {"query": "ReAct", "top_k": 5}, "output": "..."},
-  {"tool": "summarize_document",  "input": {"text": "...", "focus": ""}, "output": "..."}
+  {"tool": "list_sources",       "input": {},                             "output": "..."},
+  {"tool": "retrieve_documents", "input": {"query": "ReAct", "top_k": 5}, "output": "..."},
+  {"tool": "summarize_document", "input": {"text": "...", "focus": ""},   "output": "..."}
 ]
 ```
 
 ---
 
-## MCP Compatibility
+## 🧰 Agent Tools
 
-Every endpoint's input/output is described via JSON Schema in the OpenAPI spec
-at `GET /openapi.json`.  Any MCP-aware orchestrator can point its tool registry
-at this URL to discover and call the agent programmatically.
+The ReAct agent has access to three tools. The LLM reads their schemas and autonomously decides when and how to call them.
 
-Each `@tool` in `app/tools.py` also generates a standalone JSON schema
-(name + description + parameters) that is passed to Claude as its tool manifest,
-following the same MCP format.
-
----
-
-## Adding Your Own Documents
-
-**Via file upload:**
-```bash
-curl -X POST http://localhost:8000/ingest/file \
-  -F "file=@/path/to/your/paper.pdf"
-```
-
-**Via directory:**
-```bash
-curl -X POST "http://localhost:8000/ingest/directory?path=/path/to/docs"
-```
-
-**Supported formats:** `.pdf`, `.txt`, `.md`
+| Tool | Description |
+|------|-------------|
+| `retrieve_documents` | Semantic similarity search over ChromaDB — returns top-k chunks with scores |
+| `summarize_document` | Asks the LLM to distil a long passage, with optional focus (e.g. "key findings") |
+| `list_sources` | Lists all document file names in the vector store — always called first |
 
 ---
 
-## Adding Custom Tools
-
-Create a new tool in `app/tools.py`:
-
-```python
-from langchain_core.tools import tool
-
-@tool
-def search_pubmed(
-    query: Annotated[str, "PubMed search query"],
-    max_results: Annotated[int, "Maximum results to return"] = 10,
-) -> str:
-    """Search PubMed for biomedical research papers matching the query."""
-    # ... implementation
-    return formatted_results
-
-# Add to ALL_TOOLS list:
-ALL_TOOLS = [retrieve_documents, summarize_document, list_sources, search_pubmed]
-```
-
-The agent will automatically discover the new tool and use it when appropriate.
-
----
-
-## Docker
-
-```bash
-cp .env.example .env   # set ANTHROPIC_API_KEY
-docker-compose up -d
-```
-
-ChromaDB data is persisted in a named volume (`chroma_data`) across restarts.
-
----
-
-## Tests
-
-```bash
-pip install pytest httpx
-pytest tests/ -v
-
-# Run integration tests (requires real API key + ChromaDB):
-pytest tests/ -v -m integration
-```
-
----
-
-## Project Structure
+## 📂 Project Structure
 
 ```
-rag_agent/
+Agentic-AI-Research-Assistant/
 ├── app/
 │   ├── __init__.py
-│   ├── config.py          # Settings (pydantic-settings, .env)
+│   ├── config.py          # Settings via pydantic-settings + .env
+│   ├── llm.py             # LLM factory — Claude API or Ollama
 │   ├── embeddings.py      # Embedding function (HuggingFace / Voyage AI)
 │   ├── ingestion.py       # Load → chunk → embed → store pipeline
-│   ├── tools.py           # LangChain @tool definitions
-│   ├── agent.py           # ReAct agent builder + run_agent()
-│   ├── schemas.py         # Pydantic request/response models
-│   └── main.py            # FastAPI app + all endpoints
+│   ├── tools.py           # LangChain @tool definitions (3 tools)
+│   ├── agent.py           # ReAct AgentExecutor + run_agent()
+│   ├── schemas.py         # Pydantic v2 request/response models
+│   └── main.py            # FastAPI app + all 6 endpoints
 ├── scripts/
-│   └── query_cli.py       # Interactive CLI (no server required)
+│   └── query_cli.py       # Interactive CLI / REPL (no server needed)
 ├── tests/
-│   └── test_all.py        # Unit + integration tests
-├── sample_docs/           # Example research documents
+│   ├── __init__.py
+│   └── test_all.py        # 15 unit + integration tests
+├── sample_docs/
+│   ├── attention_is_all_you_need.txt
+│   ├── retrieval_augmented_generation.txt
+│   └── llm_agents_survey.txt
+├── .env.example           # Config template — copy to .env
+├── .gitignore
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
-├── .env.example
 └── run.py                 # Uvicorn entry point
 ```
 
 ---
 
-## Configuration Reference
+## 📥 Adding Your Own Documents
+
+**Upload via API:**
+```bash
+curl -X POST http://localhost:8000/ingest/file \
+  -F "file=@/path/to/your/paper.pdf"
+```
+
+**Ingest a directory:**
+```bash
+curl -X POST "http://localhost:8000/ingest/directory?path=/path/to/docs"
+```
+
+**Supported formats:** `.pdf` · `.txt` · `.md`
+
+Re-uploading the same file name automatically replaces the old version.
+
+---
+
+## 🔧 Adding Custom Tools
+
+Add a new `@tool` to `app/tools.py`:
+
+```python
+from langchain_core.tools import tool
+from typing import Annotated
+
+@tool
+def search_arxiv(
+    query: Annotated[str, "ArXiv search query"],
+    max_results: Annotated[int, "Maximum results to return"] = 5,
+) -> str:
+    """Search ArXiv for recent papers matching the query."""
+    # ... your implementation
+    return formatted_results
+
+# Register it:
+ALL_TOOLS = [retrieve_documents, summarize_document, list_sources, search_arxiv]
+```
+
+The agent automatically discovers the new tool from its docstring and type annotations — no other changes needed.
+
+---
+
+## 🐳 Docker
+
+```bash
+cp .env.example .env    # fill in LLM_BACKEND + API key (if using Claude)
+docker-compose up -d
+```
+
+ChromaDB data is persisted in a named Docker volume (`chroma_data`) and survives container restarts.
+
+---
+
+## 🧪 Tests
+
+```bash
+pip install pytest httpx
+pytest tests/ -v
+
+# Integration tests (requires real API key + running ChromaDB):
+pytest tests/ -v -m integration
+```
+
+---
+
+## ⚙️ Configuration Reference
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LLM_BACKEND` | `anthropic` | `anthropic` or `ollama`. Switch to Ollama for free local inference. |
-| `ANTHROPIC_API_KEY` | — | Required when `LLM_BACKEND=anthropic`. Leave blank for Ollama. |
-| `CLAUDE_MODEL` | `claude-sonnet-4-20250514` | Claude model (used when `LLM_BACKEND=anthropic`). |
-| `OLLAMA_MODEL` | `llama3` | Ollama model name (used when `LLM_BACKEND=ollama`). |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL. |
-| `CHROMA_PERSIST_DIR` | `./chroma_db` | ChromaDB persistence path. |
-| `CHROMA_COLLECTION` | `research_docs` | Collection name inside ChromaDB. |
-| `CHUNK_SIZE` | `1000` | Characters per document chunk. |
-| `CHUNK_OVERLAP` | `150` | Overlap between adjacent chunks. |
-| `RETRIEVAL_TOP_K` | `5` | Chunks returned per retrieval call. |
-| `AGENT_MAX_ITERATIONS` | `8` | Max ReAct loop iterations. |
-| `HOST` | `0.0.0.0` | Server bind address. |
-| `PORT` | `8000` | Server port. |
-| `LOG_LEVEL` | `INFO` | Logging verbosity. |
-| `VOYAGE_API_KEY` | — | Optional. Uses Voyage AI embeddings if set. |
-| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | HuggingFace model name (if no Voyage key). |
+| `LLM_BACKEND` | `anthropic` | `anthropic` or `ollama` |
+| `ANTHROPIC_API_KEY` | — | Required when `LLM_BACKEND=anthropic` |
+| `CLAUDE_MODEL` | `claude-sonnet-4-20250514` | Claude model name |
+| `OLLAMA_MODEL` | `llama3` | Ollama model name |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
+| `CHROMA_PERSIST_DIR` | `./chroma_db` | ChromaDB persistence path |
+| `CHROMA_COLLECTION` | `research_docs` | Collection name |
+| `CHUNK_SIZE` | `1000` | Characters per document chunk |
+| `CHUNK_OVERLAP` | `150` | Overlap between adjacent chunks |
+| `RETRIEVAL_TOP_K` | `5` | Chunks returned per retrieval call |
+| `AGENT_MAX_ITERATIONS` | `8` | Max ReAct loop iterations |
+| `HOST` | `0.0.0.0` | Server bind address |
+| `PORT` | `8000` | Server port |
+| `LOG_LEVEL` | `INFO` | Logging verbosity |
+| `VOYAGE_API_KEY` | — | Optional — Voyage AI embeddings |
+| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | HuggingFace embedding model |
+
+---
+
+## 🤝 MCP Compatibility
+
+Every endpoint is described via JSON Schema in the OpenAPI spec at `GET /openapi.json`. Any MCP-aware orchestrator can point its tool registry at this URL to discover and call the agent programmatically.
+
+Each `@tool` in `app/tools.py` generates a standalone JSON schema (name + description + parameters) that matches the MCP tool manifest format exactly.
+
+---
+
+<p align="center">Built with LangChain · Anthropic Claude · ChromaDB · FastAPI</p>
