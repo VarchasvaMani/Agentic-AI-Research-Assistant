@@ -1,0 +1,141 @@
+Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks
+
+Authors: Lewis et al., Facebook AI Research, 2020
+
+─────────────────────────────────────────────────────────────────────────────
+ABSTRACT
+─────────────────────────────────────────────────────────────────────────────
+
+Large pre-trained language models store factual knowledge implicitly in their
+parameters and achieve state-of-the-art results on knowledge-intensive NLP
+tasks.  However, their ability to access and precisely manipulate knowledge is
+still limited, and hence on knowledge-intensive tasks, their performance lags
+behind task-specific architectures.
+
+This paper presents Retrieval-Augmented Generation (RAG) — models that combine
+pre-trained parametric and non-parametric memory for language generation.
+A pre-trained seq2seq transformer is fine-tuned end-to-end with a dense
+passage retriever over Wikipedia.  RAG models achieve state-of-the-art results
+on three open-domain QA tasks, outperform parametric seq2seq models on fact
+verification, and generate more specific, diverse, and factual language.
+
+─────────────────────────────────────────────────────────────────────────────
+MOTIVATION
+─────────────────────────────────────────────────────────────────────────────
+
+Problems with purely parametric models (e.g., GPT-3):
+  1. Knowledge is frozen at training time — cannot be updated without retraining
+  2. Hallucination: models confidently generate plausible but false facts
+  3. Opaque reasoning — hard to verify or attribute claims to sources
+  4. Memorisation limits — not all facts can be encoded in model weights
+
+RAG addresses all four issues by externalising knowledge into a retrieval index
+that can be updated independently of the model.
+
+─────────────────────────────────────────────────────────────────────────────
+ARCHITECTURE
+─────────────────────────────────────────────────────────────────────────────
+
+Components
+  1. Query Encoder (DPR — Dense Passage Retriever)
+     • BERT-based encoder that embeds the input query into a dense vector
+     • Trained with in-batch negatives to produce strong query representations
+
+  2. Document Index (FAISS over Wikipedia)
+     • All Wikipedia passages are pre-encoded into dense vectors
+     • Retrieval via Maximum Inner Product Search (MIPS) — top-k passages
+     • Index can be updated without retraining the generator
+
+  3. Generator (BART-large)
+     • Seq2seq model fine-tuned to condition on (query + retrieved passages)
+     • Generates the final answer autoregressively
+
+Two RAG Variants
+  • RAG-Sequence: uses the same retrieved document for the entire output sequence
+  • RAG-Token: can retrieve a different document for each generated token
+    — allows the model to draw from multiple sources within one answer
+
+─────────────────────────────────────────────────────────────────────────────
+RETRIEVAL MECHANISM
+─────────────────────────────────────────────────────────────────────────────
+
+1. Input query q is encoded: p_η(z|x) ∝ exp(d(z)^T q(x))
+   where d(z) is the document embedding and q(x) is the query embedding.
+
+2. Top-k documents z_1, ..., z_k are retrieved from FAISS.
+
+3. The generator conditions on each (x, z_i) pair:
+   p_θ(y|x, z_i) = Π_t p_θ(y_t | x, z_i, y_{1:t-1})
+
+4. For RAG-Sequence, the marginalised probability is:
+   p_RAG-Seq(y|x) ≈ Σ_i p_η(z_i|x) · p_θ(y|x, z_i)
+
+─────────────────────────────────────────────────────────────────────────────
+KEY RESULTS
+─────────────────────────────────────────────────────────────────────────────
+
+Open-Domain QA — Natural Questions
+  • RAG-Token EM: 44.5% (new state-of-the-art)
+  • Previous best (T5-11B): 36.6%
+  • Closed-book GPT-3: ~29%
+
+Open-Domain QA — TriviaQA
+  • RAG-Token EM: 56.8%
+  • Previous best: 57.4% (T5-11B)
+
+Open-Domain QA — WebQ
+  • RAG-Token EM: 45.5%
+
+FEVER Fact Verification
+  • Label accuracy: 74.3% — competitive with dedicated systems
+
+Jeopardy Question Generation
+  • Human evaluators rated RAG outputs as more factual and specific
+    than parametric BART baseline
+
+─────────────────────────────────────────────────────────────────────────────
+ADVANTAGES OF RAG
+─────────────────────────────────────────────────────────────────────────────
+
+1. Updatable Knowledge
+   • The document index can be swapped without retraining the generator.
+   • New documents added overnight are immediately accessible at inference.
+
+2. Source Attribution
+   • Retrieved passages can be surfaced to the user as citations.
+   • Enables fact-checking and trust verification.
+
+3. Reduced Hallucination
+   • The generator is constrained to information in retrieved passages.
+   • Empirically produces more specific, verifiable outputs.
+
+4. Smaller Footprint
+   • RAG with BART-large outperforms T5-11B at a fraction of the parameters.
+   • Separates memorisation (index) from reasoning (model).
+
+─────────────────────────────────────────────────────────────────────────────
+LIMITATIONS
+─────────────────────────────────────────────────────────────────────────────
+
+• Retrieval latency: MIPS lookup adds ~50–200ms per query
+• Retrieval quality bottleneck: if the retriever fails to surface the right
+  passage, the generator has no chance of producing a correct answer
+• Index staleness: requires periodic re-encoding of the document corpus
+• Multi-hop reasoning: struggles when answers require synthesizing information
+  from more than two retrieved passages
+• Context window limits: only k=5 passages typically fit in the generator's
+  context; relevant information may be in passage 6 or beyond
+
+─────────────────────────────────────────────────────────────────────────────
+INFLUENCE
+─────────────────────────────────────────────────────────────────────────────
+
+RAG has become the dominant paradigm for grounding LLMs in external knowledge:
+  • LlamaIndex (GPT Index) — RAG framework for arbitrary data sources
+  • LangChain — RetrievalQA, RAG chains, and vector store integrations
+  • Microsoft Azure AI Search + OpenAI — enterprise RAG deployments
+  • ChatGPT web browsing and plugins — retrieval-augmented generation at scale
+  • Anthropic Claude — documents mode uses RAG-style grounding
+
+The pattern of (retriever + generator) trained end-to-end has been extended to
+images (REALM), code (CodeRAG), and multi-modal settings.

@@ -1,0 +1,211 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.wrap{padding:1rem 0;font-family:var(--font-sans);color:var(--color-text-primary)}
+.nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.2rem}
+.pill{padding:5px 13px;border-radius:20px;border:1px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-secondary);font-size:12px;cursor:pointer;transition:all .15s}
+.pill.active{background:var(--color-background-info);border-color:var(--color-border-secondary);color:var(--color-text-info);font-weight:500}
+.card{background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1rem}
+.card h2{font-size:16px;font-weight:500;margin-bottom:.5rem;color:var(--color-text-primary)}
+.card p{font-size:14px;line-height:1.65;color:var(--color-text-secondary);margin-bottom:.7rem}
+.card p:last-child{margin-bottom:0}
+.files{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:.9rem}
+.file{background:var(--color-background-primary);border:1px solid var(--color-border-tertiary);border-radius:8px;padding:.65rem .9rem;cursor:pointer;transition:border-color .15s}
+.file:hover{border-color:var(--color-border-secondary)}
+.file-name{font-family:var(--font-mono);font-size:12px;font-weight:500;color:var(--color-text-primary);margin-bottom:3px}
+.file-desc{font-size:11px;color:var(--color-text-tertiary);line-height:1.4}
+.flow{display:flex;flex-direction:column;gap:6px;margin-top:.9rem}
+.step{display:flex;align-items:flex-start;gap:10px;padding:.6rem .9rem;background:var(--color-background-primary);border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px}
+.step-num{min-width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;margin-top:1px}
+.step-body{flex:1}
+.step-title{font-weight:500;color:var(--color-text-primary);margin-bottom:2px}
+.step-sub{color:var(--color-text-secondary);font-size:12px;line-height:1.4}
+.n-purple{background:#EEEDFE;color:#534AB7}
+.n-teal{background:#E1F5EE;color:#0F6E56}
+.n-coral{background:#FAECE7;color:#993C1D}
+.n-amber{background:#FAEEDA;color:#854F0B}
+.n-blue{background:#E6F1FB;color:#185FA5}
+.n-gray{background:#F1EFE8;color:#5F5E5A}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;margin-right:4px;margin-bottom:4px}
+.code-block{font-family:var(--font-mono);font-size:12px;background:var(--color-background-primary);border:1px solid var(--color-border-tertiary);border-radius:6px;padding:.7rem .9rem;line-height:1.6;color:var(--color-text-secondary);overflow-x:auto;margin-top:.7rem;white-space:pre}
+.section-label{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-tertiary);margin-bottom:.5rem}
+.ask-btn{display:inline-block;margin-top:.8rem;padding:6px 14px;border-radius:6px;background:var(--color-background-info);color:var(--color-text-info);font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--color-border-tertiary)}
+.ask-btn:hover{opacity:.85}
+</style>
+<div class="wrap">
+<div class="nav" id="nav"></div>
+<div id="content"></div>
+</div>
+<script>
+const tabs = [
+  {id:'overview', label:'Overview'},
+  {id:'ingestion', label:'Ingestion'},
+  {id:'tools', label:'Tools'},
+  {id:'agent', label:'Agent'},
+  {id:'api', label:'FastAPI'},
+  {id:'flow', label:'Full flow'},
+  {id:'files', label:'All files'},
+];
+
+const pages = {
+overview: `
+<div class="card">
+  <h2>What this project is</h2>
+  <p>A fully agentic research assistant: you ask a question in plain English, and the system autonomously decides what to look up, retrieves relevant chunks from your document library, synthesizes them with Claude, and returns a grounded answer with citations.</p>
+  <p>It is <em>agentic</em> because no single hard-coded pipeline runs — Claude itself decides which tools to call, in what order, and when it has enough information to stop.</p>
+</div>
+<div class="card">
+  <h2>The four layers</h2>
+  <div class="flow">
+    <div class="step"><span class="step-num n-amber">1</span><div class="step-body"><div class="step-title">Ingestion — offline</div><div class="step-sub">PDFs and text files are chunked, embedded into vectors, and stored in ChromaDB. Happens once before you start the server.</div></div></div>
+    <div class="step"><span class="step-num n-teal">2</span><div class="step-body"><div class="step-title">Tools — capabilities</div><div class="step-sub">Three LangChain @tool functions the agent can call: retrieve_documents, summarize_document, list_sources. Each has a JSON schema Claude reads.</div></div></div>
+    <div class="step"><span class="step-num n-purple">3</span><div class="step-body"><div class="step-title">Agent — the brain</div><div class="step-sub">A LangChain ReAct agent backed by Claude. Reads tool schemas, decides which to call, loops until it can answer. Up to 8 iterations.</div></div></div>
+    <div class="step"><span class="step-num n-coral">4</span><div class="step-body"><div class="step-title">FastAPI — the interface</div><div class="step-sub">HTTP endpoints expose the agent to the world. MCP-compatible schemas at /openapi.json. Six endpoints: ask, ingest, sources, health, and more.</div></div></div>
+  </div>
+</div>
+<div class="ask-btn" onclick="sendPrompt('How does the ReAct loop work in this project?')">Ask about the ReAct loop →</div>
+`,
+
+ingestion: `
+<div class="card">
+  <h2>app/ingestion.py — the offline pipeline</h2>
+  <p>Before the server starts, you run the ingestion pipeline once (or whenever you add new documents). It turns raw files into searchable vectors.</p>
+  <div class="flow">
+    <div class="step"><span class="step-num n-amber">1</span><div class="step-body"><div class="step-title">Load</div><div class="step-sub">PyPDFLoader for .pdf files, TextLoader for .txt and .md. Each page or section becomes a LangChain Document with source metadata attached.</div></div></div>
+    <div class="step"><span class="step-num n-amber">2</span><div class="step-body"><div class="step-title">Split</div><div class="step-sub">RecursiveCharacterTextSplitter cuts documents into 1000-character chunks with 150-character overlap. Overlap prevents losing context at chunk boundaries.</div></div></div>
+    <div class="step"><span class="step-num n-amber">3</span><div class="step-body"><div class="step-title">Embed</div><div class="step-sub">app/embeddings.py returns a LangChain embedding function. Default: sentence-transformers/all-MiniLM-L6-v2 (free, local). Optional: Voyage AI (higher quality, needs API key).</div></div></div>
+    <div class="step"><span class="step-num n-amber">4</span><div class="step-body"><div class="step-title">Store</div><div class="step-sub">Chunks + vectors land in ChromaDB, persisted to ./chroma_db. Re-ingesting the same file first deletes old chunks for that source, then re-adds — safe to run repeatedly.</div></div></div>
+  </div>
+  <div class="code-block">python -m app.ingestion --docs ./sample_docs
+# → Loaded 3 docs → Split into ~40 chunks → Stored in ChromaDB</div>
+</div>
+<div class="ask-btn" onclick="sendPrompt('What is chunk overlap and why does it matter?')">Why does chunk overlap matter? →</div>
+`,
+
+tools: `
+<div class="card">
+  <h2>app/tools.py — what the agent can do</h2>
+  <p>Three functions decorated with LangChain's @tool. The decorator auto-generates a JSON schema from the function's type annotations and docstring. That schema is sent to Claude as its "tool manifest" — the same format MCP uses.</p>
+</div>
+<div class="card">
+  <h2>retrieve_documents</h2>
+  <p>Embeds the query into a vector and runs a similarity search against ChromaDB. Returns the top-k most relevant chunks with their source file names and relevance scores. This is the most-used tool — the agent calls it multiple times with different query phrasings if the first result is thin.</p>
+  <div class="code-block">Input:  { "query": "multi-head attention", "top_k": 5 }
+Output: [1] Source: paper.txt | Score: 0.921
+        MultiHead(Q,K,V) = Concat(head_1,...) × W^O ...</div>
+</div>
+<div class="card">
+  <h2>summarize_document</h2>
+  <p>Passes a long retrieved passage back to Claude with a summarization prompt. Used when raw chunks are verbose — the agent calls this to distil before composing the final answer. Accepts an optional "focus" argument (e.g. "key findings", "methodology").</p>
+</div>
+<div class="card">
+  <h2>list_sources</h2>
+  <p>Reads all unique source file names from ChromaDB metadata. The agent always calls this first to know what's available before deciding what to search for.</p>
+</div>
+<div class="ask-btn" onclick="sendPrompt('How does the @tool decorator generate a JSON schema?')">How does @tool generate schemas? →</div>
+`,
+
+agent: `
+<div class="card">
+  <h2>app/agent.py — the ReAct loop</h2>
+  <p>The agent is built with <code>create_tool_calling_agent</code> and wrapped in an <code>AgentExecutor</code>. Claude receives the tool schemas in its system prompt and autonomously decides what to call.</p>
+  <div class="flow">
+    <div class="step"><span class="step-num n-purple">T</span><div class="step-body"><div class="step-title">Thought</div><div class="step-sub">Claude reasons about what it needs. "I should list sources first to see what's available."</div></div></div>
+    <div class="step"><span class="step-num n-purple">A</span><div class="step-body"><div class="step-title">Action</div><div class="step-sub">Claude emits a tool call: { "tool": "list_sources", "input": {} }. LangChain executes it.</div></div></div>
+    <div class="step"><span class="step-num n-purple">O</span><div class="step-body"><div class="step-title">Observation</div><div class="step-sub">The tool result is injected back into the context. Claude reads it and decides the next step.</div></div></div>
+    <div class="step"><span class="step-num n-purple">↻</span><div class="step-body"><div class="step-title">Repeat</div><div class="step-sub">The loop continues — Thought → Action → Observation — until Claude emits a Final Answer or hits max_iterations (default: 8).</div></div></div>
+  </div>
+</div>
+<div class="card">
+  <h2>Key AgentExecutor settings</h2>
+  <div class="flow">
+    <div class="step"><span class="step-num n-gray">→</span><div class="step-body"><div class="step-title">handle_parsing_errors=True</div><div class="step-sub">If Claude produces malformed output, the executor recovers gracefully instead of crashing.</div></div></div>
+    <div class="step"><span class="step-num n-gray">→</span><div class="step-body"><div class="step-title">return_intermediate_steps=True</div><div class="step-sub">Every tool call and its result is recorded and returned in the API response when include_steps=true.</div></div></div>
+    <div class="step"><span class="step-num n-gray">→</span><div class="step-body"><div class="step-title">temperature=0.1</div><div class="step-sub">Very low temperature keeps Claude factual and less likely to hallucinate tool arguments or answers.</div></div></div>
+  </div>
+</div>
+<div class="ask-btn" onclick="sendPrompt('What happens when the agent hits max_iterations?')">What happens at max_iterations? →</div>
+`,
+
+api: `
+<div class="card">
+  <h2>app/main.py — FastAPI endpoints</h2>
+  <p>Six HTTP endpoints. The OpenAPI schema at /openapi.json describes every input and output in JSON Schema — the same format MCP uses, so any MCP-aware orchestrator can discover and call the agent automatically.</p>
+  <div class="flow">
+    <div class="step"><span class="step-num n-teal">GET</span><div class="step-body"><div class="step-title">/health</div><div class="step-sub">Reports ChromaDB vector count, Claude model in use. Good for uptime monitoring.</div></div></div>
+    <div class="step"><span class="step-num n-teal">GET</span><div class="step-body"><div class="step-title">/sources</div><div class="step-sub">Lists all ingested document names. Lets clients know what the agent knows about.</div></div></div>
+    <div class="step"><span class="step-num n-coral">POST</span><div class="step-body"><div class="step-title">/ask</div><div class="step-sub">The main endpoint. Accepts { question, include_steps, chat_history }. Returns { answer, sources, iterations, steps? }.</div></div></div>
+    <div class="step"><span class="step-num n-coral">POST</span><div class="step-body"><div class="step-title">/ingest/file</div><div class="step-sub">Upload a PDF or text file directly. The server chunks, embeds, and stores it. Re-uploading the same name replaces the old version.</div></div></div>
+    <div class="step"><span class="step-num n-coral">POST</span><div class="step-body"><div class="step-title">/ingest/directory</div><div class="step-sub">Point at a server-side directory path. Ingests all .pdf, .txt, .md files found recursively.</div></div></div>
+    <div class="step"><span class="step-num n-amber">DEL</span><div class="step-body"><div class="step-title">/collection</div><div class="step-sub">Wipes ChromaDB. Used during development to start fresh.</div></div></div>
+  </div>
+</div>
+<div class="card">
+  <h2>Pydantic schemas (app/schemas.py)</h2>
+  <p>Every request and response body is a Pydantic v2 model. FastAPI auto-generates JSON Schema from these, which becomes the OpenAPI spec. The AskRequest model is effectively the agent's MCP tool schema — external orchestrators can call /ask by reading /openapi.json.</p>
+</div>
+<div class="ask-btn" onclick="sendPrompt('What does a full /ask request and response look like?')">Show a full /ask example →</div>
+`,
+
+flow: `
+<div class="card">
+  <h2>A complete request, end to end</h2>
+  <p>You POST {"question": "How does multi-head attention work?"} to /ask. Here is everything that happens:</p>
+  <div class="flow">
+    <div class="step"><span class="step-num n-teal">1</span><div class="step-body"><div class="step-title">FastAPI validates the request</div><div class="step-sub">Pydantic checks question length, types. If invalid → 422 immediately, no LLM call.</div></div></div>
+    <div class="step"><span class="step-num n-teal">2</span><div class="step-body"><div class="step-title">run_agent() called in app/agent.py</div><div class="step-sub">Builds a fresh AgentExecutor with the Claude LLM and the 3 tools. Stateless — one executor per request.</div></div></div>
+    <div class="step"><span class="step-num n-purple">3</span><div class="step-body"><div class="step-title">Claude: Thought #1</div><div class="step-sub">"I should check what sources are available before searching." → calls list_sources.</div></div></div>
+    <div class="step"><span class="step-num n-purple">4</span><div class="step-body"><div class="step-title">Observation: source list returned</div><div class="step-sub">ChromaDB returns ["attention_is_all_you_need.txt", "llm_agents_survey.txt", "retrieval_augmented_generation.txt"].</div></div></div>
+    <div class="step"><span class="step-num n-purple">5</span><div class="step-body"><div class="step-title">Claude: Thought #2</div><div class="step-sub">"The attention paper is relevant. I'll retrieve from it." → calls retrieve_documents(query="multi-head attention", top_k=5).</div></div></div>
+    <div class="step"><span class="step-num n-blue">6</span><div class="step-body"><div class="step-title">ChromaDB similarity search</div><div class="step-sub">Query is embedded → cosine similarity against all stored vectors → top 5 chunks returned with scores.</div></div></div>
+    <div class="step"><span class="step-num n-purple">7</span><div class="step-body"><div class="step-title">Claude: Thought #3 (maybe)</div><div class="step-sub">If chunks are long/dense, Claude calls summarize_document to distil them. Otherwise skips straight to answering.</div></div></div>
+    <div class="step"><span class="step-num n-purple">8</span><div class="step-body"><div class="step-title">Claude: Final Answer</div><div class="step-sub">Synthesizes retrieved context into a clear answer. Cites [Source: attention_is_all_you_need.txt].</div></div></div>
+    <div class="step"><span class="step-num n-teal">9</span><div class="step-body"><div class="step-title">FastAPI serialises the response</div><div class="step-sub">{ answer, sources: ["attention_is_all_you_need.txt"], iterations: 3, steps: null } → JSON to client.</div></div></div>
+  </div>
+</div>
+<div class="ask-btn" onclick="sendPrompt('How does ChromaDB similarity search work internally?')">How does ChromaDB search work? →</div>
+`,
+
+files: `
+<div class="card">
+  <h2>Every file and what it does</h2>
+  <div class="files">
+    <div class="file" onclick="sendPrompt('Explain app/config.py in detail')"><div class="file-name">app/config.py</div><div class="file-desc">Pydantic-settings. All config from .env, cached singleton via lru_cache.</div></div>
+    <div class="file" onclick="sendPrompt('Explain app/embeddings.py in detail')"><div class="file-name">app/embeddings.py</div><div class="file-desc">Swappable embedding layer. HuggingFace default, Voyage AI if key set.</div></div>
+    <div class="file" onclick="sendPrompt('Explain app/ingestion.py in detail')"><div class="file-name">app/ingestion.py</div><div class="file-desc">Load → chunk → embed → store pipeline. Deduplicates on re-ingest.</div></div>
+    <div class="file" onclick="sendPrompt('Explain app/tools.py in detail')"><div class="file-name">app/tools.py</div><div class="file-desc">Three @tool functions. Schemas auto-generated for Claude's tool manifest.</div></div>
+    <div class="file" onclick="sendPrompt('Explain app/agent.py in detail')"><div class="file-name">app/agent.py</div><div class="file-desc">Builds AgentExecutor + ReAct loop. run_agent() returns structured result.</div></div>
+    <div class="file" onclick="sendPrompt('Explain app/schemas.py in detail')"><div class="file-name">app/schemas.py</div><div class="file-desc">Pydantic v2 request/response models → OpenAPI / MCP-compatible schemas.</div></div>
+    <div class="file" onclick="sendPrompt('Explain app/main.py in detail')"><div class="file-name">app/main.py</div><div class="file-desc">FastAPI app. 6 endpoints: ask, ingest, sources, health, delete.</div></div>
+    <div class="file" onclick="sendPrompt('Explain scripts/query_cli.py in detail')"><div class="file-name">scripts/query_cli.py</div><div class="file-desc">Interactive REPL and single-question CLI. No server needed.</div></div>
+    <div class="file" onclick="sendPrompt('Explain tests/test_all.py in detail')"><div class="file-name">tests/test_all.py</div><div class="file-desc">15 tests: config, ingestion, tools (mocked), all API endpoints.</div></div>
+    <div class="file" onclick="sendPrompt('Explain run.py in detail')"><div class="file-name">run.py</div><div class="file-desc">Uvicorn entry point. Reads host/port from settings.</div></div>
+    <div class="file" onclick="sendPrompt('What is .env.example used for?')"><div class="file-name">.env.example</div><div class="file-desc">Template for all environment variables with inline docs.</div></div>
+    <div class="file" onclick="sendPrompt('How does the Dockerfile work?')"><div class="file-name">Dockerfile + compose</div><div class="file-desc">Pre-downloads embedding model. Persists ChromaDB in a named volume.</div></div>
+  </div>
+  <p style="font-size:12px;color:var(--color-text-tertiary);margin-top:.8rem">Click any file to ask a detailed question about it.</p>
+</div>
+`,
+};
+
+const nav = document.getElementById('nav');
+const content = document.getElementById('content');
+let current = 'overview';
+
+function render(id) {
+  current = id;
+  content.innerHTML = pages[id];
+  nav.querySelectorAll('.pill').forEach(p => p.classList.toggle('active', p.dataset.id === id));
+}
+
+tabs.forEach(t => {
+  const btn = document.createElement('button');
+  btn.className = 'pill' + (t.id === current ? ' active' : '');
+  btn.dataset.id = t.id;
+  btn.textContent = t.label;
+  btn.onclick = () => render(t.id);
+  nav.appendChild(btn);
+});
+
+render('overview');
+</script>

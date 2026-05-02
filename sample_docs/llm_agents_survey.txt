@@ -1,0 +1,169 @@
+LLM-Powered Autonomous Agents — Survey and Analysis
+
+Source: Lilian Weng, OpenAI Blog, June 2023 (synthesized summary)
+
+─────────────────────────────────────────────────────────────────────────────
+OVERVIEW
+─────────────────────────────────────────────────────────────────────────────
+
+Large language models (LLMs) have demonstrated remarkable capabilities not
+just as standalone text generators but as the "brain" of autonomous agent
+systems.  An LLM-powered agent combines:
+
+  1. Planning — decomposing complex tasks into sub-goals
+  2. Memory — storing and retrieving past observations
+  3. Tool use — calling external APIs, code executors, search engines
+  4. Action — taking steps in an environment with real-world consequences
+
+This survey examines the three core components of modern LLM agent systems
+and the ReAct (Reason + Act) framework that underpins most production systems.
+
+─────────────────────────────────────────────────────────────────────────────
+COMPONENT 1: PLANNING
+─────────────────────────────────────────────────────────────────────────────
+
+Task Decomposition
+  Agents must break high-level goals into sequences of manageable sub-tasks.
+  Approaches include:
+
+  • Chain-of-Thought (CoT) prompting — elicit step-by-step reasoning
+  • Tree of Thoughts (ToT) — explore multiple reasoning branches in parallel
+  • LLM+P — translate tasks to PDDL for classical planners
+  • ReAct — interleave reasoning traces with tool-use actions
+
+Self-Reflection
+  • Reflexion (Shinn et al., 2023): agent stores failed attempts as verbal
+    reinforcement signals; on retry, it conditions on past mistakes.
+  • CRITIC: LLM critiques its own output then refines iteratively.
+  • Improves task success rate significantly on coding and QA benchmarks.
+
+─────────────────────────────────────────────────────────────────────────────
+COMPONENT 2: MEMORY
+─────────────────────────────────────────────────────────────────────────────
+
+Memory types in the human analogy:
+  • Sensory memory → in-context window (immediate inputs)
+  • Short-term memory → conversation history / scratchpad
+  • Long-term memory → external vector store (ChromaDB, FAISS, Pinecone)
+
+External Memory (Long-Term)
+  Vector databases allow agents to store and retrieve arbitrary information
+  using semantic similarity:
+    1. Information is embedded into dense vectors at write time
+    2. At query time, the agent embeds a query and retrieves nearest neighbours
+    3. Retrieved context is injected into the LLM's prompt for that turn
+
+  This is how RAG (Retrieval-Augmented Generation) is used in agent systems:
+  the agent's "memory" is the vector store, and retrieval is how it remembers.
+
+─────────────────────────────────────────────────────────────────────────────
+COMPONENT 3: TOOL USE
+─────────────────────────────────────────────────────────────────────────────
+
+Tool types commonly given to agents:
+  • Web search — retrieve current information beyond training cutoff
+  • Code interpreter — execute Python, validate results numerically
+  • Calculator — precise arithmetic without hallucination risk
+  • Database / API calls — structured data retrieval
+  • Document retrieval — RAG over private knowledge bases
+  • File system — read/write persistent state
+
+Tool Schema Design (MCP-compatible)
+  Each tool is described to the LLM via a JSON schema:
+  {
+    "name": "retrieve_documents",
+    "description": "Search research corpus for relevant chunks",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {"type": "string", "description": "Search query"},
+        "top_k": {"type": "integer", "description": "Number of results", "default": 5}
+      },
+      "required": ["query"]
+    }
+  }
+
+  The LLM reads these schemas and decides autonomously which tool to call,
+  what arguments to pass, and how to interpret the result.
+
+  The Model Context Protocol (MCP) standardises this schema format so any
+  MCP-aware client can discover and call any MCP-compatible tool server.
+
+─────────────────────────────────────────────────────────────────────────────
+THE REACT FRAMEWORK
+─────────────────────────────────────────────────────────────────────────────
+
+ReAct (Yao et al., 2022) interleaves reasoning and acting:
+
+  Thought: I need to find information about transformer attention mechanisms.
+  Action: retrieve_documents(query="transformer self-attention mechanism")
+  Observation: [chunk 1: "Attention(Q,K,V) = softmax(QK^T/√d_k)V..."]
+  Thought: I have the formula. Now I need to understand multi-head attention.
+  Action: retrieve_documents(query="multi-head attention projection")
+  Observation: [chunk 2: "MultiHead(Q,K,V) = Concat(head_1,...,head_h)W^O"]
+  Thought: I have enough information to answer the question.
+  Final Answer: [synthesized response]
+
+Key properties:
+  • Interleaved reasoning prevents the agent from calling tools blindly
+  • Each Observation can change the agent's next Thought (feedback loop)
+  • The loop terminates when the agent emits a "Final Answer" or hits max_iterations
+  • LangChain's AgentExecutor implements this loop automatically
+
+─────────────────────────────────────────────────────────────────────────────
+TOOL SELECTION MECHANISM
+─────────────────────────────────────────────────────────────────────────────
+
+How does the agent decide which tool to call?
+
+  1. The LLM receives all tool schemas in its context.
+  2. It reads the user's question and current scratchpad (past thoughts/observations).
+  3. It generates a "thought" explaining its reasoning.
+  4. It selects the tool whose name + description best matches what it needs.
+  5. It generates the tool arguments as a JSON object matching the tool's schema.
+  6. The executor calls the tool and injects the result as an "Observation".
+  7. The LLM reads the observation and decides whether to call another tool or answer.
+
+The selection is driven entirely by the LLM's language understanding — it reads
+the tool description and matches it to the current need.  This is why writing
+clear, specific tool descriptions is critical for agent reliability.
+
+─────────────────────────────────────────────────────────────────────────────
+BENCHMARK RESULTS
+─────────────────────────────────────────────────────────────────────────────
+
+HotpotQA (multi-hop QA)
+  • ReAct: 35.1% EM (exact match) vs Chain-of-Thought: 29.4%
+  • ReAct avoids hallucination by retrieving rather than guessing
+
+ALFWorld (household task agent)
+  • ReAct: 71% success vs imitation learning: 37%
+  • Self-reflection (Reflexion) boosts to 87% success
+
+WebShop (online shopping agent)
+  • ReAct: 40.7% task success vs human: 59.6%
+  • Gap remains due to complex multi-page navigation requirements
+
+─────────────────────────────────────────────────────────────────────────────
+CHALLENGES AND OPEN PROBLEMS
+─────────────────────────────────────────────────────────────────────────────
+
+1. Long-horizon planning — agents struggle beyond ~10 steps
+2. Context window constraints — full history doesn't always fit
+3. Error propagation — mistakes early in the chain compound later
+4. Hallucinated tool calls — LLM may invent tool arguments not in the schema
+5. Evaluation — measuring agent performance is harder than single-turn QA
+6. Safety — agentic systems can take irreversible real-world actions
+7. Latency — multi-step loops multiply inference time linearly
+
+─────────────────────────────────────────────────────────────────────────────
+PRODUCTION BEST PRACTICES
+─────────────────────────────────────────────────────────────────────────────
+
+• Set max_iterations to prevent infinite loops (typically 8–15)
+• Use handle_parsing_errors=True to recover from malformed LLM output
+• Log every tool call and observation for debugging and auditing
+• Return intermediate steps to users when transparency is important
+• Gate destructive tool calls (DELETE, POST to external APIs) behind confirmation
+• Use streaming responses for latency-sensitive applications
+• Cache embedding lookups to reduce ChromaDB round-trip time
