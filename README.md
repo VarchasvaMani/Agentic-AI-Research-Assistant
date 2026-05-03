@@ -8,7 +8,6 @@
   <img src="https://img.shields.io/badge/Claude_API-Anthropic-blueviolet?logo=anthropic&logoColor=white" />
   <img src="https://img.shields.io/badge/Ollama-Local_LLM-black?logo=ollama&logoColor=white" />
   <img src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white" />
-  <img src="https://img.shields.io/badge/License-MIT-yellow" />
 </p>
 
 <p align="center">
