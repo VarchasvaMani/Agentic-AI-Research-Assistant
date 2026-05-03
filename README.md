@@ -1,4 +1,4 @@
-# 🔬 Agentic RAG Research Assistant
+# 🔬 Agentic AI Research Assistant
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white" />
